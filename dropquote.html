@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dropquote Puzzle</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f6f1e7; --ink:#1d1b17; --muted:#7a7266; --rule:#cfc6b4;
+    --cell:#fffdf8; --block:#1d1b17; --sel:#f2d27a; --word:#f8ebc4;
+    --bad:#e3a49a; --good:#b9d8b0; --used:#c9c0ae;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,system-ui,sans-serif;
+       display:flex;justify-content:center;padding:32px 16px 48px}
+  main{width:100%;max-width:1280px}
+  h1,.lede{text-align:center;margin-left:auto;margin-right:auto}
+  h1{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:clamp(28px,5vw,40px);margin:0 0 6px;letter-spacing:-.01em}
+  .lede{color:var(--muted);margin:0 0 28px;font-size:15px;line-height:1.5;max-width:56ch}
+  .wrap{overflow-x:auto;padding-bottom:6px}
+  .puzzle{--n:31;--sz:clamp(24px, calc((100vw - 40px) / var(--n)), 40px);
+          display:grid;grid-template-columns:repeat(var(--n),var(--sz));justify-content:center;gap:0;width:max-content;margin:0 auto}
+  .bank{display:flex;flex-direction:column-reverse;align-items:center;justify-content:flex-start;
+        padding-bottom:6px;border-bottom:2px solid var(--ink);min-height:calc(var(--sz)*2.4)}
+  .bank span{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:calc(var(--sz)*.36);
+             line-height:1.25;transition:color .15s}
+  .bank span.used{color:var(--used);text-decoration:line-through}
+  .cell{width:var(--sz);height:var(--sz);border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);
+        background:var(--cell);display:flex;align-items:center;justify-content:center;
+        font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:calc(var(--sz)*.5);
+        cursor:pointer;user-select:none;position:relative}
+  .cell.first{border-left:1px solid var(--rule)}
+  .cell.block{background:var(--block);border-color:var(--block);cursor:default}
+  .cell.word{background:var(--word)}
+  .cell.sel{background:var(--sel)}
+  .cell.bad{background:var(--bad)}
+  .cell.good{background:var(--good)}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:28px 0 10px}
+  button{font:500 14px Inter,sans-serif;padding:9px 16px;border-radius:999px;border:1px solid var(--ink);
+         background:transparent;color:var(--ink);cursor:pointer}
+  button:hover{background:var(--ink);color:var(--paper)}
+  #msg{text-align:center;min-height:22px;color:var(--muted);font-size:14px}
+  #msg.win{color:#2f6b2a;font-weight:500}
+  details{margin-top:28px;border-top:1px solid var(--rule);padding-top:16px;color:var(--muted);font-size:14px;line-height:1.55}
+  summary{cursor:pointer;color:var(--ink);font-weight:500}
+  #modal{position:fixed;inset:0;background:rgba(29,27,23,.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:10}
+  #modal.open{display:flex;animation:fade .5s ease}
+  #modal .card{background:var(--paper);border:1px solid var(--ink);padding:36px 32px 28px;max-width:420px;text-align:center;
+               box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  #modal p{font-family:Fraunces,Georgia,serif;font-size:24px;line-height:1.3;margin:0 0 10px}
+  #modal button{margin-top:16px}
+  #modal .card{max-width:500px}
+  #modal p{font-size:21px}
+  #modal p.cmd{font-family:Inter,sans-serif;font-size:16px;margin-top:22px;color:var(--muted)}
+  #modal code{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--ink);background:var(--word);padding:2px 8px;border-radius:4px}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  #kb{position:fixed;opacity:0;pointer-events:none;left:0;top:0;width:1px;height:1px}
+  @media print{
+    body{background:#fff;padding:0} .controls,#msg,details,.lede{display:none}
+    .cell.sel,.cell.word{background:var(--cell)} .bank span.used{color:var(--ink);text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Dropquote</h1>
+  <p class="lede">The letters above each column drop into the squares directly below them to spell a short verse. Black squares separate words. Tap a square and type; letters cross off their column as you use them.</p>
+
+  <div class="wrap"><div class="puzzle" id="puzzle"></div></div>
+
+  <div class="controls">
+    <button id="clear">Clear</button>
+  </div>
+  <div id="msg"></div>
+
+  <details>
+    <summary>How to solve</summary>
+    Start with short words and squares whose column has only one letter left, then use the crossed-off letters to whittle down what's left in each column.
+  </details>
+  <div id="modal" role="dialog" aria-modal="true">
+    <div class="card">
+      <p>As you finish the phrase, Clotho&rsquo;s eyes turn milky white. She says nothing else, yet points to the words floating in the air behind you.</p>
+      <p class="cmd">Type <code>!LachesisSees</code> to continue.</p>
+      <button id="modal-close">Close</button>
+    </div>
+  </div>
+  <input id="kb" autocomplete="off" autocapitalize="characters" inputmode="text">
+</main>
+
+<script>
+const TEXT = "HELP YOURSELF TO HELL WITH THE REST EVEN THE ONE WHO LOVES YOU BEST", COLS = 14;
+// word-wrap: whole words only, never split across rows
+const LINES = [];
+for (const word of TEXT.split(" ")) {
+  const last = LINES[LINES.length - 1];
+  if (last && (last + " " + word).length <= COLS) LINES[LINES.length - 1] = last + " " + word;
+  else LINES.push(word);
+}
+const W = Math.max(...LINES.map(l => l.length)), H = LINES.length;
+const sol = LINES.map(l => l.padEnd(W, " ").split(""));
+const playable = (r, c) => sol[r][c] !== " ";
+const entry = sol.map((row, r) => row.map((_, c) => playable(r, c) ? "" : null));
+// seeded RNG so the decoys are the same every time
+let seed = 1105;
+const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+const DECOYS = "EEETTAAOONNRRSSHHLLIIDUWY";
+const banks = [];
+for (let c = 0; c < W; c++) {
+  const letters = [];
+  for (let r = 0; r < H; r++) if (sol[r][c] !== " ") letters.push(sol[r][c]);
+  banks.push(letters.sort());
+}
+
+const P = document.getElementById("puzzle");
+P.style.setProperty("--n", W);
+const bankEls = [], cellEls = [];
+for (let c = 0; c < W; c++) {
+  const b = document.createElement("div"); b.className = "bank";
+  bankEls.push(banks[c].map(ch => { const s = document.createElement("span"); s.textContent = ch; b.appendChild(s); return s; }));
+  P.appendChild(b);
+}
+for (let r = 0; r < H; r++) {
+  cellEls.push([]);
+  for (let c = 0; c < W; c++) {
+    const d = document.createElement("div");
+    d.className = "cell" + (c === 0 ? " first" : "") + (playable(r, c) ? "" : " block");
+    if (playable(r, c)) d.addEventListener("click", () => select(r, c));
+    P.appendChild(d); cellEls[r].push(d);
+  }
+}
+// bank spans are displayed bottom-up via column-reverse; reverse DOM so alphabetical reads top-down
+bankEls.forEach((spans, c) => { const parent = spans[0].parentNode; spans.slice().reverse().forEach(s => parent.appendChild(s)); });
+
+let cur = null;
+const kb = document.getElementById("kb");
+const msg = document.getElementById("msg");
+
+function wordSpan(r, c) {
+  let a = c, b = c;
+  while (a > 0 && sol[r][a-1] !== " ") a--;
+  while (b < W-1 && sol[r][b+1] !== " ") b++;
+  return [a, b];
+}
+function render() {
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+    const el = cellEls[r][c]; if (!playable(r, c)) continue;
+    el.textContent = entry[r][c];
+    el.classList.remove("sel","word");
+  }
+  if (cur) {
+    const [a, b] = wordSpan(cur.r, cur.c);
+    for (let c = a; c <= b; c++) cellEls[cur.r][c].classList.add("word");
+    cellEls[cur.r][cur.c].classList.add("sel");
+  }
+  for (let c = 0; c < W; c++) {
+    const counts = {};
+    for (let r = 0; r < H; r++) if (entry[r][c]) counts[entry[r][c]] = (counts[entry[r][c]]||0) + 1;
+    bankEls[c].forEach(s => s.classList.remove("used"));
+    bankEls[c].forEach(s => { if (counts[s.textContent] > 0) { counts[s.textContent]--; s.classList.add("used"); } });
+  }
+}
+function clearMarks(){ cellEls.flat().forEach(e => e.classList.remove("bad","good")); msg.textContent=""; msg.className=""; }
+function select(r, c){ cur = {r, c}; render(); kb.focus({preventScroll:true}); }
+function step(dr, dc){
+  if (!cur) return;
+  let r = cur.r, c = cur.c;
+  for (let i = 0; i < W*H; i++) {
+    c += dc; r += dr;
+    if (c >= W) { c = 0; r++; } if (c < 0) { c = W-1; r--; }
+    if (r >= H) r = 0; if (r < 0) r = H-1;
+    if (playable(r, c)) { cur = {r, c}; return render(); }
+  }
+}
+function put(ch){
+  if (!cur) return;
+  clearMarks(); entry[cur.r][cur.c] = ch; step(0, 1); checkWin();
+}
+function checkWin(){
+  const done = sol.every((row, r) => row.every((ch, c) => !playable(r, c) || entry[r][c] === (ch === " " ? "" : ch)));
+  if (done) { cur = null; render(); kb.blur(); document.getElementById("modal").classList.add("open"); }
+}
+document.addEventListener("keydown", e => {
+  if (!cur) return;
+  const k = e.key;
+  if (/^[a-zA-Z]$/.test(k)) { e.preventDefault(); put(k.toUpperCase()); }
+  else if (k === " ") { e.preventDefault(); put(""); }
+  else if (k === "Backspace") { e.preventDefault(); clearMarks();
+    if (entry[cur.r][cur.c]) entry[cur.r][cur.c] = ""; else { step(0,-1); entry[cur.r][cur.c] = ""; } render(); }
+  else if (k === "Delete") { entry[cur.r][cur.c] = ""; render(); }
+  else if (k === "ArrowRight") { e.preventDefault(); step(0,1); }
+  else if (k === "ArrowLeft") { e.preventDefault(); step(0,-1); }
+  else if (k === "ArrowDown") { e.preventDefault(); step(1,0); }
+  else if (k === "ArrowUp") { e.preventDefault(); step(-1,0); }
+});
+kb.addEventListener("input", () => { const v = kb.value.slice(-1); kb.value = ""; if (/[a-zA-Z]/.test(v)) put(v.toUpperCase()); else if (v === " ") put(""); });
+
+document.getElementById("modal-close").onclick = () => document.getElementById("modal").classList.remove("open");
+document.getElementById("clear").onclick = () => {
+  clearMarks(); entry.forEach((row, r) => row.forEach((_, c) => { if (row[c] !== null) row[c] = ""; })); render();
+};
+render();
+</script>
+</body>
+</html>
